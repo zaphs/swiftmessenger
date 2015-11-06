@@ -12,6 +12,8 @@ class Manager {
     
     static let sharedInstance = Manager()
     
+    //TODO get user data
+    var user = User()
     var newMessageCount:Int
     var username: String {
         get {

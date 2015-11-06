@@ -15,6 +15,48 @@ class ConversationCell: UITableViewCell {
     @IBOutlet var messageLabel: UILabel!
     @IBOutlet var timeLabel: UILabel!
     
+    func bindViewModel(viewModel: ConversationViewModel){
+        
+        let model = viewModel.model
+        
+        var opponent = User()
+        if model.sender.userId == Manager.sharedInstance.user.userId {
+            opponent = model.recipient
+        } else {
+            opponent = model.sender
+        }
+        
+        if let url = NSURL(string: opponent.avatarUrl) {
+            avatarImageView.sd_setImageWithURL(url)
+        } else {
+            avatarImageView.image = UIImage(named: "no_avatar")
+        }
+        
+        nameLabel.text = opponent.displayName
+        
+        viewModel.message.didChange.addHandler(self, handler: ConversationCell.didChangeMessage)
+        viewModel.read.didChange.addHandler(self, handler: ConversationCell.didChangeRead)
+        
+        viewModel.render()
+    }
+    
+    func didChangeMessage(oldValue: Message, newValue: Message){
+        messageLabel.text = newValue.text
+        
+        let timestamp = NSTimeInterval.init(newValue.timestamp)
+        let dateFormatter = NSDateFormatter()
+//        dateFormatter.dateStyle = NSDateFormatterStyle.MediumStyle
+        dateFormatter.dateFormat = "dd MMM HH:mm"
+        timeLabel.text = dateFormatter.stringFromDate(NSDate(timeIntervalSince1970: timestamp))
+    }
+    
+    func didChangeRead(oldValue: Bool, newValue: Bool){
+        if !newValue {
+            self.backgroundColor = UIColor.lightGrayColor()
+        } else {
+            self.backgroundColor = UIColor.whiteColor()
+        }
+    }
 }
 
 class MessagesViewController: UITableViewController {
@@ -35,6 +77,9 @@ class MessagesViewController: UITableViewController {
     func reloadContent(){
         if let items = Conversation.MR_findAllSortedBy("lastMessageTimestamp", ascending: false) as? [Conversation] {
             conversations = items
+//            conversations = items.map({ (conversation) -> ConversationViewModel in
+//                return ConversationViewModel(model: conversation)
+//            })
         }
         
         tableView.reloadData()
@@ -65,29 +110,10 @@ extension MessagesViewController {
     
     override func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCellWithIdentifier("ConversationCell", forIndexPath: indexPath) as! ConversationCell
-    
+        
         let conversation = conversations[indexPath.row]
-        
-        //TODO get who is opponent
-        
-        let opponent = conversation.sender
-        if let url = NSURL(string: opponent.avatarUrl) {
-            cell.avatarImageView.sd_setImageWithURL(url)
-        } else {
-            cell.avatarImageView.image = UIImage(named: "no_avatar")
-        }
+        cell.bindViewModel(ConversationViewModel(model: conversation))
 
-        cell.nameLabel.text = conversation.sender.displayName
-        
-        let predicate = NSPredicate(format: "conversation == %@", conversation)
-        let message = Message.MR_findFirstWithPredicate(predicate, sortedBy: "timestamp", ascending: false)
-        let timestamp = NSTimeInterval.init(message.timestamp)
-        let dateFormatter = NSDateFormatter()
-//        dateFormatter.dateStyle = NSDateFormatterStyle.MediumStyle
-        dateFormatter.dateFormat = "dd MMM HH:mm"
-        cell.timeLabel.text = dateFormatter.stringFromDate(NSDate(timeIntervalSince1970: timestamp))
-        cell.messageLabel.text = message.text
-    
         return cell
     }
     

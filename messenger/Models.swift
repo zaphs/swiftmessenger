@@ -37,7 +37,7 @@ class Conversation: NSManagedObject {
 
     @NSManaged var sender: User
     @NSManaged var recipient: User
-    @NSManaged var messages: Message
+    @NSManaged var messages: [Message]
 }
 
 

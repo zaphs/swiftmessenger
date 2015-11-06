@@ -93,8 +93,8 @@ class DialogsViewController: UIViewController, UITableViewDelegate, UITableViewD
                             conversation.conversationId = conversationId
                             conversation.subject = subject
                             conversation.read = read
-                            conversation.previewText = previewText
-                            conversation.lastMessageTimestamp = lastMessageTimestamp
+//                            conversation.previewText = previewText
+                            conversation.timestamp = lastMessageTimestamp
                             
                             let opponentPredicate = NSPredicate(format: "userId = %i", opponentId)
                             var opponent = User.MR_findFirstWithPredicate(opponentPredicate, inContext: ctx)
@@ -173,9 +173,9 @@ extension DialogsViewController {
         cell.displayName.text = opponent.displayName
         cell.avatar.sd_setImageWithURL(NSURL(string: opponent.avatarUrl))
         cell.onlineStatus.hidden = !(opponent.online as Bool)
-        cell.previewText.text = conversation.previewText
+//        cell.previewText.text = conversation.previewText
         
-        let timestamp = NSDate(timeIntervalSince1970: NSTimeInterval(conversation.lastMessageTimestamp))
+        let timestamp = NSDate(timeIntervalSince1970: NSTimeInterval(conversation.timestamp))
         let dateFormatter = NSDateFormatter()
         dateFormatter.dateFormat = "hh:mm"
         cell.timeLabel.text = dateFormatter.stringFromDate(timestamp)

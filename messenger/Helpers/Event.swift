@@ -6,8 +6,6 @@
 //  Copyright © 2015 Zaph. All rights reserved.
 //
 
-import Foundation
-
 /// An object that has some tear-down logic
 public protocol Disposable {
     func dispose()
