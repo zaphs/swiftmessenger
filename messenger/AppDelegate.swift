@@ -8,15 +8,85 @@
 
 import UIKit
 import CoreData
+import Alamofire
+import MagicalRecord
+
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
-
+    var ping: Ping!
 
     func application(application: UIApplication, didFinishLaunchingWithOptions launchOptions: [NSObject: AnyObject]?) -> Bool {
         // Override point for customization after application launch.
+        
+        application.registerUserNotificationSettings(UIUserNotificationSettings(
+            forTypes: [UIUserNotificationType.Badge, UIUserNotificationType.Alert, UIUserNotificationType.Sound],
+            categories: nil))
+        
+        MagicalRecord.setupCoreDataStackWithAutoMigratingSqliteStoreNamed("messenger.sqlite")
+        
+        // Display UILocalNotification if application was not running.
+        if let options = launchOptions {
+            if let notif = options[UIApplicationLaunchOptionsLocalNotificationKey] as? UILocalNotification {
+                self.application(application, didReceiveLocalNotification: notif)
+            }
+        }
+        
+        ping = Ping.sharedInstance
+
+        let command = PingCommand(name: "get", defaultParams: ["count": "\(Manager.sharedInstance.newMessageCount)"],
+                prepareBlock: { json in
+
+                    NSNotificationCenter.defaultCenter().postNotificationName(WXNotifications.NewMessageReceived.rawValue, object: nil, userInfo:
+                        [
+                            "newMessageCount": 1
+                        ])
+                    
+                return true
+            },
+    
+            completeBlock: { json in
+                
+                if let newMessageCount = json["new_message_count"].int {
+                    Manager.sharedInstance.newMessageCount = newMessageCount
+                    NSNotificationCenter.defaultCenter().postNotificationName(WXNotifications.NewMessageReceived.rawValue, object: nil, userInfo:
+                        [
+                            "newMessageCount": newMessageCount
+                        ])
+                }
+                
+//                var localNotification = UILocalNotification()
+//                localNotification.alertAction = "You have new message"
+//                localNotification.alertBody = "Admin says: Hello"
+//                localNotification.alertTitle = "Some title"
+//                localNotification.fireDate = NSDate(timeIntervalSinceNow: 10)
+//                UIApplication.sharedApplication().scheduleLocalNotification(localNotification)
+                
+            return true
+        })
+        
+        ping.addCommand(command)
+        ping.start()
+        
+        let params = ["userId":1]
+
+        HttpClient.sharedInstance.sendRequest(HttpClient.accountInfoUrl, parameters: params) { response in
+            switch(response){
+            case .Success(let json):
+                if let backgroundColor = json["data"]["backgroundColor"].string,
+                    let tintColor = json["data"]["tintColor"].string {
+                        Settings.sharedInstance.backgroundColor = UIColor(hex: backgroundColor)
+                        Settings.sharedInstance.tintColor = UIColor(hex: tintColor)
+                }
+            case .Error(let error):
+                NSLog("accountInfoUrl .Error: \(error)")
+            }
+        }
+        
+        application.setMinimumBackgroundFetchInterval(UIApplicationBackgroundFetchIntervalMinimum)
+        
         return true
     }
 
@@ -36,75 +106,65 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        application.applicationIconBadgeNumber = 0
     }
 
     func applicationWillTerminate(application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
-        // Saves changes in the application's managed object context before the application terminates.
-        self.saveContext()
+        MagicalRecord.cleanUp()
     }
-
-    // MARK: - Core Data stack
-
-    lazy var applicationDocumentsDirectory: NSURL = {
-        // The directory the application uses to store the Core Data store file. This code uses a directory named "zaph.messenger" in the application's documents Application Support directory.
-        let urls = NSFileManager.defaultManager().URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)
-        return urls[urls.count-1] as! NSURL
-    }()
-
-    lazy var managedObjectModel: NSManagedObjectModel = {
-        // The managed object model for the application. This property is not optional. It is a fatal error for the application not to be able to find and load its model.
-        let modelURL = NSBundle.mainBundle().URLForResource("messenger", withExtension: "momd")!
-        return NSManagedObjectModel(contentsOfURL: modelURL)!
-    }()
-
-    lazy var persistentStoreCoordinator: NSPersistentStoreCoordinator? = {
-        // The persistent store coordinator for the application. This implementation creates and return a coordinator, having added the store for the application to it. This property is optional since there are legitimate error conditions that could cause the creation of the store to fail.
-        // Create the coordinator and store
-        var coordinator: NSPersistentStoreCoordinator? = NSPersistentStoreCoordinator(managedObjectModel: self.managedObjectModel)
-        let url = self.applicationDocumentsDirectory.URLByAppendingPathComponent("messenger.sqlite")
-        var error: NSError? = nil
-        var failureReason = "There was an error creating or loading the application's saved data."
-        if coordinator!.addPersistentStoreWithType(NSSQLiteStoreType, configuration: nil, URL: url, options: nil, error: &error) == nil {
-            coordinator = nil
-            // Report any error we got.
-            var dict = [String: AnyObject]()
-            dict[NSLocalizedDescriptionKey] = "Failed to initialize the application's saved data"
-            dict[NSLocalizedFailureReasonErrorKey] = failureReason
-            dict[NSUnderlyingErrorKey] = error
-            error = NSError(domain: "YOUR_ERROR_DOMAIN", code: 9999, userInfo: dict)
-            // Replace this with code to handle the error appropriately.
-            // abort() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-            NSLog("Unresolved error \(error), \(error!.userInfo)")
-            abort()
-        }
+    
+    func application(application: UIApplication, openURL url: NSURL, sourceApplication: String?, annotation: AnyObject) -> Bool {
+        return true
+    }
+    
+    func application(application: UIApplication, didReceiveLocalNotification notification: UILocalNotification) {
+        NSLog("AppDelegate.didReceiveLocalNotification")
+//        let notificationCenter = NSNotificationCenter.defaultCenter()
+//        notificationCenter.postNotificationName(kAdFromNotification, object: nil, userInfo: notification.userInfo)
         
-        return coordinator
-    }()
+    }
+    
+    func application(application: UIApplication, didRegisterUserNotificationSettings notificationSettings: UIUserNotificationSettings) {
+        NSLog("AppDelegate.didRegisterUserNotificationSettings: \(notificationSettings.debugDescription)")
+    }
+    
+//    
+//    func application(application: UIApplication, handleActionWithIdentifier identifier: String?, forLocalNotification notification: UILocalNotification, completionHandler: () -> Void) {
+//        log.debug("handleActionWithIdentifier \(identifier)")
+//        
+//        let info = notification.userInfo as? Dictionary<String,String>
+//        
+//        if let hash = info?["groupUniqueHash"] {
+//            log.debug("handleActionWithIdentifier hash -> \(hash)")
+//            
+//            let group = AdGroup.MR_findFirstByAttribute("uniqueHash", withValue: hash)
+//            if group == nil {
+//                log.debug("handleActionWithIdentifier hash -> \(hash). Group is nill")
+//                return
+//            }
+//            
+//            if let ad = group.sortedAds.first where identifier == "favorite" {
+//                ad.bookmarked = true
+//                log.debug("handleActionWithIdentifier bookmarked!")
+//            }
+//            
+//            if identifier == "snooze" {
+//                group.snooze()
+//                log.debug("handleActionWithIdentifier snoozed!")
+//            }
+//            
+//        } else {
+//            log.debug("handleActionWithIdentifier No groupUniqueHash")
+//        }
+//        
+//        completionHandler()
+//    }
+//    
+    func application(application: UIApplication, performFetchWithCompletionHandler completionHandler: (UIBackgroundFetchResult) -> Void) {
 
-    lazy var managedObjectContext: NSManagedObjectContext? = {
-        // Returns the managed object context for the application (which is already bound to the persistent store coordinator for the application.) This property is optional since there are legitimate error conditions that could cause the creation of the context to fail.
-        let coordinator = self.persistentStoreCoordinator
-        if coordinator == nil {
-            return nil
-        }
-        var managedObjectContext = NSManagedObjectContext()
-        managedObjectContext.persistentStoreCoordinator = coordinator
-        return managedObjectContext
-    }()
-
-    // MARK: - Core Data Saving support
-
-    func saveContext () {
-        if let moc = self.managedObjectContext {
-            var error: NSError? = nil
-            if moc.hasChanges && !moc.save(&error) {
-                // Replace this implementation with code to handle the error appropriately.
-                // abort() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                NSLog("Unresolved error \(error), \(error!.userInfo)")
-                abort()
-            }
-        }
+//        completionHandler(.NewData)
+        
     }
 
 }
