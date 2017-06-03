@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import MagicalRecord
 
 class ConversationCell: UITableViewCell {
 
@@ -19,8 +20,8 @@ class ConversationCell: UITableViewCell {
         
         let model = viewModel.model
         
-        var opponent = User()
-        if model.sender.userId == Manager.sharedInstance.user.userId {
+        var opponent: User!
+        if Manager.sharedInstance.user.userId == model.sender.userId {
             opponent = model.recipient
         } else {
             opponent = model.sender
@@ -52,7 +53,7 @@ class ConversationCell: UITableViewCell {
     
     func didChangeRead(oldValue: Bool, newValue: Bool){
         if !newValue {
-            self.backgroundColor = UIColor.lightGrayColor()
+            self.backgroundColor = UIColor.whiteColor()
         } else {
             self.backgroundColor = UIColor.whiteColor()
         }
@@ -75,14 +76,42 @@ class MessagesViewController: UITableViewController {
     }
 
     func reloadContent(){
-        if let items = Conversation.MR_findAllSortedBy("lastMessageTimestamp", ascending: false) as? [Conversation] {
-            conversations = items
+//        if let items = Conversation.MR_findAllSortedBy("lastMessageTimestamp", ascending: false) as? [Conversation] {
+//            conversations = items
 //            conversations = items.map({ (conversation) -> ConversationViewModel in
 //                return ConversationViewModel(model: conversation)
 //            })
+        
+        MagicalRecord.saveWithBlockAndWait{ctx in
+        
+            let fakeConversation = Conversation.MR_createEntity()
+            fakeConversation.timestamp = 0
+            fakeConversation.subject = "Hello!"
+            fakeConversation.conversationId = 1
+            fakeConversation.read = false
+            fakeConversation.sender = Manager.sharedInstance.opponent
+            fakeConversation.recipient = Manager.sharedInstance.user
+            
+            let message = Message.MR_createEntity()
+            message.messageId = 1
+            message.timestamp = 1
+            message.read = false
+            message.isSystem = false
+            message.text = "Hello! How are you today?"
+            message.recipient = Manager.sharedInstance.user
+            message.sender = Manager.sharedInstance.opponent
+            message.conversation = fakeConversation
+            
+            fakeConversation.messages = [message]
+            
+            self.conversations = [fakeConversation]
+            
+            self.tableView.reloadData()
         }
         
-        tableView.reloadData()
+//        }
+        
+
     }
     
     /*

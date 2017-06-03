@@ -7,13 +7,15 @@
 //
 
 import Foundation
+import MagicalRecord
 
 class Manager {
     
     static let sharedInstance = Manager()
     
     //TODO get user data
-    var user = User()
+    var user: User!
+    var opponent: User!
     var newMessageCount:Int
     var username: String {
         get {
@@ -34,6 +36,18 @@ class Manager {
     
     private init() {
         newMessageCount = 0
+        
+        user = User.MR_createEntity()
+        user.userId = 1
+        user.online = true
+        user.avatarUrl = ""
+        user.displayName = "Kevin Foster"
+
+        opponent = User.MR_createEntity()
+        opponent.userId = 2
+        opponent.online = true
+        opponent.avatarUrl = ""
+        opponent.displayName = "Robert Downey, Jr."        
     }
 
 }

@@ -37,7 +37,7 @@ class Conversation: NSManagedObject {
 
     @NSManaged var sender: User
     @NSManaged var recipient: User
-    @NSManaged var messages: [Message]
+    @NSManaged var messages: NSSet
 }
 
 
@@ -53,7 +53,7 @@ class Message: NSManagedObject {
     @NSManaged var recipient: User
     @NSManaged var sender: User
     @NSManaged var conversation: Conversation
-    @NSManaged var attachments: Attachment
+    @NSManaged var attachments: NSSet
 }
 
 //@objc(Attachment)
